@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: AggieDine Serverless Service Template
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.11
+    MemorySize: 256
+    Environment:
+      Variables:
+        SERVICE_NAME: !Ref ServiceName
+        ENVIRONMENT: !Ref Environment
+        LOG_LEVEL: !Ref LogLevel
+        DYNAMODB_TABLE_NAME: !Ref DynamoDBTable
+        S3_BUCKET_NAME: !Ref S3Bucket
+        AWS_COGNITO_REGION: !Ref AWS::Region
+        AWS_COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+        AWS_COGNITO_APP_CLIENT_ID: !Ref CognitoAppClientId
+
+Parameters:
+  ServiceName:
+    Type: String
+    Default: template-serverless-service
+  Environment:
+    Type: String
+    Default: development
+    AllowedValues:
+      - development
+      - staging
+      - production
+  LogLevel:
+    Type: String
+    Default: info
+  CognitoUserPoolId:
+    Type: String
+    Default: ""
+  CognitoAppClientId:
+    Type: String
+    Default: ""
+
+Resources:
+  # --- API Gateway ---
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowHeaders:
+          - "*"
+        AllowMethods:
+          - "*"
+
+  # --- API Lambda ---
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app/handler.handler
+      CodeUri: .
+      Description: FastAPI application served via Mangum
+      Events:
+        CatchAll:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+        Root:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /
+            Method: ANY
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+        - S3CrudPolicy:
+            BucketName: !Ref S3Bucket
+
+  # --- Scraper Lambda ---
+  ScraperFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: scrapers/menu_scraper.handler
+      CodeUri: .
+      Description: Scheduled menu scraper
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(30 minutes)
+            Enabled: true
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+        - S3CrudPolicy:
+            BucketName: !Ref S3Bucket
+
+  # --- DynamoDB Table ---
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+
+  # --- S3 Bucket ---
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  DynamoDBTableName:
+    Description: DynamoDB table name
+    Value: !Ref DynamoDBTable
+  S3BucketName:
+    Description: S3 bucket name
+    Value: !Ref S3Bucket

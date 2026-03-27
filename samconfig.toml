@@ -1,0 +1,7 @@
+[default.deploy.parameters]
+stack_name = "template-serverless-service"
+resolve_s3 = true
+s3_prefix = "template-serverless-service"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
