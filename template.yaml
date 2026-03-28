@@ -21,7 +21,7 @@ Globals:
 Parameters:
   ServiceName:
     Type: String
-    Default: template-serverless-service
+    Default: aggiedine-backend-service
   Environment:
     Type: String
     Default: development
