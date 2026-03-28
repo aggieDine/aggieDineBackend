@@ -91,9 +91,9 @@ class scraper():
             return 0
 
 
-if __name__ == "__main":
+if __name__ == "__main__":
 
-    times = ["breakfast", "lunch", "dinner"]
+    times = ["brunch", "dinner"]
     
     urls = {"Commons": "https://dineoncampus.com/tamu/whats-on-the-menu/the-commons-dining-hall-south-campus/", "Sbisa" : "https://dineoncampus.com/tamu/whats-on-the-menu/sbisa-dining-hall-north-campus/", "Duncan" : "https://dineoncampus.com/tamu/whats-on-the-menu/duncan-dining-hall-south-campus-quad/"}
     my_scraper = scraper(urls)
