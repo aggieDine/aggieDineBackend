@@ -57,7 +57,7 @@ Resources:
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: app/handler.handler
+      Handler: app.handler.handler
       CodeUri: .
       Description: FastAPI application served via Mangum
       Events:
@@ -83,8 +83,10 @@ Resources:
   ScraperFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: scrapers/menu_scraper.handler
+      Handler: scrapers.scraper.handler
       CodeUri: .
+      Timeout: 180
+      MemorySize: 512
       Description: Scheduled menu scraper
       Events:
         ScheduleEvent:
