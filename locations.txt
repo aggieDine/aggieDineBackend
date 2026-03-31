@@ -1,1 +1,39 @@
-test,0,0
+Chick-fil-A (Memorial Student Center), 30.6123, -96.3414, American Fast Food, meat_focused_chicken
+Rev's American Grill (Memorial Student Center), 30.6123, -96.3414, American, meat_focused_beef
+Panda Express (Memorial Student Center), 30.6123, -96.3414, Chinese American, meat_focused_chicken
+Spin 'n Stone Pizza (Memorial Student Center), 30.6123, -96.3414, Italian/Pizza, vegan_friendly
+Shake Smart (Memorial Student Center), 30.6123, -96.3414, Smoothies and Shakes, vegan_friendly
+Cabo Grill (Memorial Student Center), 30.6123, -96.3414, Tex-Mex, meat_focused_chicken
+Abu Omar Halal (Memorial Student Center), 30.6123, -96.3414, Mediterranean Halal, meat_focused_chicken
+Houston Street Subs (Memorial Student Center), 30.6123, -96.3414, Sandwiches and Deli, meat_focused_turkey
+Chick-fil-A (Sbisa Underground), 30.6186, -96.3416, American Fast Food, meat_focused_chicken
+Houston Street Subs (Sbisa Underground), 30.6186, -96.3416, Sandwiches and Deli, meat_focused_turkey
+Einstein Bros. Bagels (Sbisa Underground), 30.6186, -96.3416, Bakery and Cafe, vegan_friendly
+1876 Burgers (Sbisa Retail), 30.6186, -96.3416, American, meat_focused_beef
+Copperhead Jack's (Sbisa Northside), 30.6186, -96.3416, Tex-Mex, meat_focused_beef
+Smoothie King (Sbisa Underground), 30.6186, -96.3416, Smoothies, vegan_friendly
+Pizza @ Underground (Sbisa), 30.6186, -96.3416, Italian/Pizza, vegan_friendly
+Salata (Polo Road Garage), 30.6225, -96.3364, Salad Bar, vegan_friendly
+Panda Express (Polo Road Garage), 30.6225, -96.3364, Chinese American, meat_focused_chicken
+Houston Street Subs (Polo Road Garage), 30.6225, -96.3364, Sandwiches and Deli, meat_focused_turkey
+Shake Smart (Polo Road Garage), 30.6225, -96.3364, Smoothies and Shakes, vegan_friendly
+Market at Polo Road Garage, 30.6225, -96.3364, Convenience and Snacks, vegan_friendly
+The Grill at Creekside, 30.6247, -96.3440, American, meat_focused_beef
+Spin 'n Stone Pasta (Creekside), 30.6247, -96.3440, Italian/Pasta, vegan_friendly
+Spin 'n Stone Pizza (Creekside), 30.6247, -96.3440, Italian/Pizza, vegan_friendly
+Houston Street Subs (Creekside), 30.6247, -96.3440, Sandwiches and Deli, meat_focused_turkey
+Creekside Market, 30.6247, -96.3440, Convenience and Snacks, vegan_friendly
+Chick-fil-A (West Campus Food Hall), 30.6150, -96.3600, American Fast Food, meat_focused_chicken
+Copperhead Jack's (West Campus Food Hall), 30.6150, -96.3600, Tex-Mex, meat_focused_beef
+Houston Street Subs (West Campus Food Hall), 30.6150, -96.3600, Sandwiches and Deli, meat_focused_turkey
+Shake Smart (West Campus Food Hall), 30.6150, -96.3600, Smoothies and Shakes, vegan_friendly
+Einstein Bros. Bagels (White Creek Eatery), 30.6133, -96.3571, Bakery and Cafe, vegan_friendly
+Starbucks (Evans Library), 30.6166, -96.3388, Coffee and Cafe, vegan_friendly
+Starbucks (Hullabaloo Hall), 30.6191, -96.3396, Coffee and Cafe, vegan_friendly
+Starbucks (Quad), 30.6092, -96.3400, Coffee and Cafe, vegan_friendly
+Starbucks (Zachry Engineering), 30.6212, -96.3404, Coffee and Cafe, vegan_friendly
+Starbucks (Memorial Student Center), 30.6123, -96.3414, Coffee and Cafe, vegan_friendly
+Aggie Express (Commons), 30.6095, -96.3385, Convenience and Snacks, vegan_friendly
+Aggie Express (Pavilion), 30.6171, -96.3374, Convenience and Snacks, vegan_friendly
+Aggie Express (Hullabaloo), 30.6191, -96.3396, Convenience and Snacks, vegan_friendly
+The University Club (Rudder Tower), 30.6125, -96.3406, American Fine Dining, meat_focused_beef
