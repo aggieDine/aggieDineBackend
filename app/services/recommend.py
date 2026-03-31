@@ -76,6 +76,9 @@ class recommendation:
                 if location["restriction"].startswith("vegan"):
                     new_locs.append(location)
 
+        else:
+            new_locs = locations
+
         
         return new_locs
     
