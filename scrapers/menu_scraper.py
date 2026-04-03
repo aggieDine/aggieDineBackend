@@ -107,7 +107,7 @@ def parse_menu_items(menu_data: dict) -> list:
 def handler(event, context):
     table_name = os.environ.get("DYNAMODB_TABLE_NAME")
     bucket_name = os.environ.get("S3_BUCKET_NAME")
-    region = os.environ.get("AWS_REGION", "us-east-1")
+    region = os.environ.get("AWS_REGION", "us-east-2")
 
     dynamodb = boto3.resource("dynamodb", region_name=region)
     table    = dynamodb.Table(table_name)
