@@ -55,6 +55,15 @@ def fetch_locations() -> list:
         locations.extend(building.get("locations", []))
     return locations
 
+def fetch_location_details(location_id: str) -> dict:
+    url  = f"{BASE_API}/locations/{location_id}/details"
+    data = _get(url)
+    time.sleep(REQUEST_DELAY_SECONDS)
+    return {
+        "status_label":   data.get("status", {}).get("label", ""),
+        "status_message": data.get("status", {}).get("message", ""),
+    }
+
 
 def fetch_periods(location_id: str, date_str: str) -> list:
     url  = f"{BASE_API}/locations/{location_id}/periods/?date={date_str}"
@@ -80,21 +89,29 @@ def parse_menu_items(menu_data: dict) -> list:
     for category in categories:
         station = category.get("name", "Unknown Station")
         for item in category.get("items", []):
-            allergens = [f["name"] for f in item.get("filters", []) if f.get("type") == "allergen"]
-            labels    = [f["name"] for f in item.get("filters", []) if f.get("type") == "label"]
+            # All filters (allergens, diet labels, etc.) — no type field exists
+            filters = [f["name"] for f in item.get("filters", [])]
+            
             nutrients = [
-                {"name": n.get("name"), "value": n.get("value"), "unit": n.get("uom")}
+                {
+                    "name":          n.get("name"),
+                    "value":         n.get("value"),
+                    "unit":          n.get("uom"),
+                    "value_numeric": n.get("valueNumeric"),
+                }
                 for n in item.get("nutrients", [])
+                if n.get("value") and n.get("value") != "-"  # skip empty values
             ]
+
             items.append({
+                "id":          item.get("id", ""),
                 "name":        item.get("name", ""),
                 "station":     station,
                 "description": item.get("desc", ""),
                 "portion":     item.get("portion", ""),
                 "ingredients": item.get("ingredients", ""),
                 "calories":    item.get("calories", ""),
-                "allergens":   allergens,
-                "labels":      labels,
+                "filters":     filters,   # contains allergens + diet labels + icons
                 "nutrients":   nutrients,
             })
     return items
