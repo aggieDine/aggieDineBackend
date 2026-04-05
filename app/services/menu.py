@@ -7,21 +7,18 @@ from app.config import settings
 
 
 def get_latest_scrape_key(table, date: str) -> str | None:
-    """Query DynamoDB for the most recent scrape S3 key for a given date."""
-    from boto3.dynamodb.conditions import Key
+    from boto3.dynamodb.conditions import Key, Attr
     
     response = table.query(
-        KeyConditionExpression=Key("PK").eq("SCRAPE#latest") & Key("SK").begins_with(f"SCRAPE#{date}"),
+        KeyConditionExpression=Key("PK").eq("SCRAPE#latest"),
+        FilterExpression=Attr("date").eq(date),
         ScanIndexForward=False,
-        Limit=1,
     )
     items = response.get("Items", [])
-    print(f"[DEBUG] DynamoDB query for date {date} returned {len(items)} items")
-    if items:
-        print(f"[DEBUG] Found s3_key: {items[0].get('s3_key')}")
-    
     if not items:
         return None
+    # Sort by scraped_at to get the latest
+    items.sort(key=lambda x: x.get("scraped_at", ""), reverse=True)
     return items[0].get("s3_key")
 
 
