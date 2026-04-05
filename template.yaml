@@ -57,7 +57,7 @@ Resources:
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: app/handler.handler
+      Handler: app.handler.handler
       CodeUri: .
       Description: FastAPI application served via Mangum
       Events:
@@ -92,7 +92,7 @@ Resources:
         ScheduleEvent:
           Type: Schedule
           Properties:
-            Schedule: rate(30 minutes)
+            Schedule: rate(1 day)
             Enabled: true
       Policies:
         - DynamoDBCrudPolicy:

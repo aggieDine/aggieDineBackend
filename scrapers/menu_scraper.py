@@ -55,15 +55,6 @@ def fetch_locations() -> list:
         locations.extend(building.get("locations", []))
     return locations
 
-def fetch_location_details(location_id: str) -> dict:
-    url  = f"{BASE_API}/locations/{location_id}/details"
-    data = _get(url)
-    time.sleep(REQUEST_DELAY_SECONDS)
-    return {
-        "status_label":   data.get("status", {}).get("label", ""),
-        "status_message": data.get("status", {}).get("message", ""),
-    }
-
 
 def fetch_periods(location_id: str, date_str: str) -> list:
     url  = f"{BASE_API}/locations/{location_id}/periods/?date={date_str}"
@@ -91,6 +82,8 @@ def parse_menu_items(menu_data: dict) -> list:
         for item in category.get("items", []):
             # All filters (allergens, diet labels, etc.) — no type field exists
             filters = [f["name"] for f in item.get("filters", [])]
+            calories_raw = item.get("calories", "")
+            calories = int(calories_raw) if calories_raw != "" and calories_raw is not None else None
             
             nutrients = [
                 {
@@ -110,7 +103,7 @@ def parse_menu_items(menu_data: dict) -> list:
                 "description": item.get("desc", ""),
                 "portion":     item.get("portion", ""),
                 "ingredients": item.get("ingredients", ""),
-                "calories":    item.get("calories", ""),
+                "calories": calories,
                 "filters":     filters,   # contains allergens + diet labels + icons
                 "nutrients":   nutrients,
             })
@@ -169,14 +162,15 @@ def handler(event, context):
             items = parse_menu_items(menu_data)
             total_items += len(items)
 
+
             all_menus.append({
-                "location_id":   loc_id,
-                "location_name": loc_name,
-                "date":          today,
-                "period_id":     period_id,
-                "period_name":   period_name,
-                "item_count":    len(items),
-                "items":         items,
+                "location_id":      loc_id,
+                "location_name":    loc_name,
+                "date":             today,
+                "period_id":        period_id,
+                "period_name":      period_name,
+                "item_count":       len(items),
+                "items":            items,
             })
 
     # ---- 3. Build final payload -------------------------------------------
