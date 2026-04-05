@@ -4,4 +4,6 @@ ILSQ Food Truck (West Campus), 30.6113, -96.3461, Rotating Food Truck, meat_mixe
 
 
 
+
+
 Currently unused, as locations and times change often
