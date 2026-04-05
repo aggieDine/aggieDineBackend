@@ -17,10 +17,8 @@ class recommendation:
     }
     
 
-    def __init__(self, current_location: tuple, center_of_interest: tuple, radius: float, user_id: str):
+    def __init__(self, current_location: tuple, user_id: str):
         self.current_location = current_location
-        self.center = center_of_interest
-        self.radius = radius
         self.restriction, self.time = self._get_details(user_id)
         self.all_food_loc = self._get_food_locs()
 
@@ -122,12 +120,12 @@ class recommendation:
         return new_locs
     
 
-    def recommend(self) -> list:
+    def recommend(self, center_of_interest: tuple, radius: float) -> list:
 
         """
-        Recommends the places that the user can eat. Current methodology: Finds places within specified search circle, filters the locations by user restriction, then sorts by distance fom user
-        Limitations: If no places within search circle fit the user's needs, it returns nothing
-        Input: none
+        Recommends the places that the user can eat. Current methodology: Finds places within specified search circle, filters the locations by user restriction, then sorts by distance from user.
+        Limitations: If no places within search circle fit the user's needs, it returns nothing.
+        Input: center_of_interest as a tuple (lat, long), radius as a float in meters
         Output: Recommended places to eat as a list of dictionaries. Dictionary structure: {'name': name, 'cuisine': cuisine, 'restriction': restriction, 'distance': distance from user}
         """
 
@@ -138,7 +136,7 @@ class recommendation:
 
         for location in self.all_food_loc:
             name, (coord, cuisine, restriction) = next(iter(location.items()))
-            if self._within_radius(self.center, coord, self.radius):
+            if self._within_radius(center_of_interest, coord, radius):
                 recom_locs.append({'name': name, 'cuisine': cuisine, 'restriction': restriction, 'distance': self._calc_distance(self.current_location, coord)})
 
         #     TODO: Finish
@@ -157,5 +155,5 @@ class recommendation:
     
 
 if __name__ == "__main__":
-    new_rec = recommendation((30.6123, -96.3414),(30.6123, -96.3414), 400.0, "user1")
-    print(new_rec.recommend())
+    new_rec = recommendation((30.6123, -96.3414), "user1")
+    print(new_rec.recommend((30.6123, -96.3414), 400.0))
