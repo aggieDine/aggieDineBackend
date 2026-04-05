@@ -17,9 +17,12 @@ class recommendation:
     }
     
 
-    def __init__(self, current_location: tuple, user_id: str):
+    def __init__(self, current_location: tuple, user_id: str, restriction: str = None):
         self.current_location = current_location
-        self.restriction, self.time = self._get_details(user_id)
+        self.restriction = restriction # Currently this method, but in future this will be populated using user id
+
+        #self.restriction, self.time = self._get_details(user_id)
+
         self.all_food_loc = self._get_food_locs()
 
 
@@ -43,7 +46,7 @@ class recommendation:
     def _get_details(self, user_id: str) -> tuple[list, float]:
 
         """
-        TODO: Needs implementation. Currently everything is hardcoded
+        TODO: Needs implementation. Currently everything is hardcoded. Not used anywhere currently
 
         Obtains the details of an user through some form of id.
         Input: User ID
