@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
 
     # AWS
-    AWS_REGION: str = "us-east-1"
+    AWS_REGION: str = "us-east-2"
 
     # AWS Cognito
     AWS_COGNITO_REGION: str = "us-east-1"

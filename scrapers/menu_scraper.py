@@ -22,7 +22,7 @@ BASE_API  = "https://apiv4.dineoncampus.com"
 SITE_ID   = "5751fd4290975b60e0489534"
 
 # 1. Format the ScraperAPI URL
-SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "YOUR_API_KEY_HERE")
+# SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "YOUR_API_KEY_HERE")
 # Note: Requires http:// at the front for request libraries
 PROXY_URL = "http://sqhmhfry:to40ugbwi9ea@p.webshare.io:80"
 
