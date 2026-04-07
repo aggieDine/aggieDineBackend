@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# AWS SAM
+.aws-sam/
+
+# Environment / secrets
+.env
+*.pem
+serviceAccountKey.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+*.json 
+scrapers/non-production/
+test_menu.py
