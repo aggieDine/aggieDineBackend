@@ -94,7 +94,6 @@ def handler(event, context):
     )
     print("DynamoDB SCRAPE#latest successfully updated!")
 
-    # ---- NEW CODE TO ADD ----
     # 7. Clean up: Delete the original fragmented files
     if files:
         # Boto3 requires the delete list to be formatted as a list of dicts

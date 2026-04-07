@@ -1,0 +1,11 @@
+.git
+.gitignore
+.aws-sam
+template.yaml
+__pycache__/
+*.pyc
+*.json
+events/
+scrapers/non-production/
+scrapers/venv/
+app/
