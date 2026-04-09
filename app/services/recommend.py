@@ -1,3 +1,5 @@
+from urllib import response
+
 import uuid
 
 from datetime import datetime, timezone
@@ -6,6 +8,32 @@ from rich import print
 
 from geopy.distance import geodesic
 
+import requests
+
+# List of all the locations, this is currently hardcoded.
+from locations import ALL_FOOD_LOCATIONS
+
+
+# Makes API call and parses data to get the hours of the locations. Currently done at the start of the program.
+
+today = datetime.now().strftime("%Y-%m-%d")
+url = f"https://nh19d71sp8.execute-api.us-east-2.amazonaws.com/hours?date={today}"
+
+parsed_locations = {}
+for places in requests.get(url).json()["locations"]:
+    parsed_hours = []
+    for hours in places["hours"]:
+
+        start_time, end_time = hours.split(" - ")
+        start_time = start_time.replace("a", "AM").replace("p", "PM")
+        end_time = end_time.replace("a", "AM").replace("p", "PM")
+        start_time = datetime.strptime(start_time, "%I:%M%p").time()
+        end_time = datetime.strptime(end_time, "%I:%M%p").time()
+        parsed_hours.append((start_time, end_time))
+
+    parsed_locations[places["location"].lower()] = parsed_hours
+
+DATA = {"date": today, "data": parsed_locations}
 
 class recommendation:
 
@@ -22,25 +50,6 @@ class recommendation:
         self.restriction = restriction # Currently this method, but in future this will be populated using user id
 
         #self.restriction, self.time = self._get_details(user_id)
-
-        self.all_food_loc = self._get_food_locs()
-
-
-    def _get_food_locs(self) -> list:
-
-        """
-        Currently reads locations from locations.txt to load all locations into data with addition info
-        Input: none
-        Output: List of Dictionaries in this format {name: [(lat, long), type of food, restriction]}
-        """
-
-        food_locations = []
-        with open("locations.txt", "r") as f:
-            for location in f:
-                loc = location.strip().split(", ")
-                food_locations.append({loc[0]:[(float(loc[1]),float(loc[2])), loc[3], loc[4]]})
-        
-        return food_locations
     
 
     def _get_details(self, user_id: str) -> tuple[list, float]:
@@ -122,6 +131,27 @@ class recommendation:
         
         return new_locs
     
+    def _find_is_open(self, locs: list) -> list:
+
+        """
+        Uses the data gathered from API. This is not efficient, but it is a proof of concept. In the future, we can use a more efficient data structure to store the hours of the locations, but for now this is sufficient.
+        Input: list of locations
+        Output: list of locations that are open
+        """
+
+        open_locs = []
+        current_time = datetime.now().time()
+        api_data = DATA["data"]
+        
+        for loc in locs:
+            name = loc["name"].lower()
+            if name in api_data:
+                for start_time, end_time in api_data[name]:
+                    if start_time <= current_time <= end_time:
+                        open_locs.append(loc)
+                        break 
+
+        return open_locs
 
     def recommend(self, center_of_interest: tuple, radius: float) -> list:
 
@@ -137,14 +167,15 @@ class recommendation:
         if not self._is_on_campus():
             raise ValueError("Location is out of bounds")
 
-        for location in self.all_food_loc:
-            name, (coord, cuisine, restriction) = next(iter(location.items()))
+        for location in ALL_FOOD_LOCATIONS:
+
+            name, coord, cuisine, restriction = location["name"], (location["latitude"], location["longitude"]), location["cuisine"], location["restriction"]
+
             if self._within_radius(center_of_interest, coord, radius):
+
                 recom_locs.append({'name': name, 'cuisine': cuisine, 'restriction': restriction, 'distance': self._calc_distance(self.current_location, coord)})
 
-        #     TODO: Finish
-        #
-        #        1: Get the recommended locations from S3
+        recom_locs = self._find_is_open(recom_locs)
 
         recom_locs = self._filter_by_restriction(recom_locs)
 
