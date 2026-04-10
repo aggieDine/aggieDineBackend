@@ -48,7 +48,7 @@ class recommendation:
     def __init__(self, current_location: tuple, user_id: str, restriction: str = None, time: str = None):
         self.current_location = current_location
         self.restriction = restriction # Currently this method, but in future this will be populated using user id
-        if time == None:
+        if time == None or time == "":
             self.time = datetime.now().time()
         else:
             self.time = datetime.strptime(time, "%I:%M%p").time()
@@ -97,7 +97,7 @@ class recommendation:
         return self._calc_distance(point_1, point_2) <= radius
     
 
-    def _is_on_campus(self) -> bool:
+    def _is_on_campus(self, location_of_interest: tuple) -> bool:
 
         """
         Finds if the location of the user is within 1 mile of the campus bounds as specified in TAMU_BOUNDS
@@ -105,7 +105,7 @@ class recommendation:
         Output: Boolean
         """
 
-        lat, long = self.current_location
+        lat, long = location_of_interest
         return self.TAMU_BOUNDS['south'] <= lat <= self.TAMU_BOUNDS['north'] and self.TAMU_BOUNDS['west'] <= long <= self.TAMU_BOUNDS['east']
     
 
@@ -182,7 +182,7 @@ class recommendation:
 
         recom_locs = []
 
-        if not self._is_on_campus():
+        if not self._is_on_campus(center_of_interest):
             return recom_locs
 
         for location in ALL_FOOD_LOCATIONS:
