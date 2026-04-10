@@ -11,7 +11,7 @@ from geopy.distance import geodesic
 import requests
 
 # List of all the locations, this is currently hardcoded.
-from locations import ALL_FOOD_LOCATIONS
+from app.services.locations import ALL_FOOD_LOCATIONS
 
 
 # Makes API call and parses data to get the hours of the locations. Currently done at the start of the program.
