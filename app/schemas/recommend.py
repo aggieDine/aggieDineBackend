@@ -12,6 +12,7 @@ class RecommendationRequest(BaseModel):
     radius: float
     user_id: str
     restriction: str | None = None
+    time: str | None = None
 
 
 class RecommendationItem(BaseModel):

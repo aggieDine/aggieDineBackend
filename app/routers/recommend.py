@@ -16,6 +16,7 @@ def get_recommendations(req: RecommendationRequest):
             current_location=curr_loc,
             user_id=req.user_id,
             restriction=req.restriction,
+            time=req.time
         )
 
         results = rec_engine.recommend(

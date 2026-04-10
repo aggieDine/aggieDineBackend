@@ -45,14 +45,18 @@ class recommendation:
     }
     
 
-    def __init__(self, current_location: tuple, user_id: str, restriction: str = None):
+    def __init__(self, current_location: tuple, user_id: str, restriction: str = None, time: str = None):
         self.current_location = current_location
         self.restriction = restriction # Currently this method, but in future this will be populated using user id
+        if time == None:
+            self.time = datetime.now().time()
+        else:
+            self.time = datetime.strptime(time, "%I:%M%p").time()
 
-        #self.restriction, self.time = self._get_details(user_id)
+        #self.restriction = self._get_details(user_id)
     
 
-    def _get_details(self, user_id: str) -> tuple[list, float]:
+    def _get_details(self, user_id: str) -> list:
 
         """
         TODO: Needs implementation. Currently everything is hardcoded. Not used anywhere currently
@@ -63,13 +67,13 @@ class recommendation:
         """
 
         restriction = "vegetarian"
-        time = None
+        
         #####################################################################################################
         #########            TODO: Add logic to get the restrictions of the user and                #########            
         #########                   the time they have to get food                                  #########
         #####################################################################################################
 
-        return(restriction,time)    
+        return restriction   
 
 
     def _calc_distance(self, point_1: tuple, point_2: tuple) -> float:
@@ -125,9 +129,23 @@ class recommendation:
                 if location["restriction"].startswith("vegan"):
                     new_locs.append(location)
 
+        elif self.restriction == "chicken":
+            for location in locations:
+                if location["restriction"].endswith("chicken"):
+                    new_locs.append(location)
+
+        elif self.restriction == "beef":
+            for location in locations:
+                if location["restriction"].endswith("beef"):
+                    new_locs.append(location)
+        
+        elif self.restriction == "meat":
+            for location in locations:
+                if location["restriction"].startswith("meat"):
+                    new_locs.append(location)
+
         else:
             new_locs = locations
-
         
         return new_locs
     
@@ -140,7 +158,7 @@ class recommendation:
         """
 
         open_locs = []
-        current_time = datetime.now().time()
+        current_time = self.time
         api_data = DATA["data"]
         
         for loc in locs:
@@ -165,7 +183,7 @@ class recommendation:
         recom_locs = []
 
         if not self._is_on_campus():
-            raise ValueError("Location is out of bounds")
+            return recom_locs
 
         for location in ALL_FOOD_LOCATIONS:
 
