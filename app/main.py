@@ -1,8 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
 
 from app.config import settings
 from app.routers import example, health
+
+from app.services.recommend import recommendation
 
 app = FastAPI(
     title=settings.SERVICE_NAME,
