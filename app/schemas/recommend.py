@@ -20,6 +20,7 @@ class RecommendationItem(BaseModel):
     cuisine: str
     restriction: str
     distance: float
+    score: float
 
 
 class RecommendationResponse(BaseModel):

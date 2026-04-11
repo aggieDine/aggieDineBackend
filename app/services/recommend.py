@@ -10,28 +10,36 @@ from geopy.distance import geodesic
 
 import requests
 
+from shapely.geometry import Point, LineString
+
 # List of all the locations, this is currently hardcoded.
 from app.services.locations import ALL_FOOD_LOCATIONS
 
+
+EVERYTHING_OPEN = False #Incase the hours cannot be fetched
 
 # Makes API call and parses data to get the hours of the locations. Currently done at the start of the program.
 
 today = datetime.now().strftime("%Y-%m-%d")
 url = f"https://nh19d71sp8.execute-api.us-east-2.amazonaws.com/hours?date={today}"
 
-parsed_locations = {}
-for places in requests.get(url).json()["locations"]:
-    parsed_hours = []
-    for hours in places["hours"]:
+try:   
+    parsed_locations = {}
+    for places in requests.get(url).json()["locations"]:
+        parsed_hours = []
+        for hours in places["hours"]:
 
-        start_time, end_time = hours.split(" - ")
-        start_time = start_time.replace("a", "AM").replace("p", "PM")
-        end_time = end_time.replace("a", "AM").replace("p", "PM")
-        start_time = datetime.strptime(start_time, "%I:%M%p").time()
-        end_time = datetime.strptime(end_time, "%I:%M%p").time()
-        parsed_hours.append((start_time, end_time))
+            start_time, end_time = hours.split(" - ")
+            start_time = start_time.replace("a", "AM").replace("p", "PM")
+            end_time = end_time.replace("a", "AM").replace("p", "PM")
+            start_time = datetime.strptime(start_time, "%I:%M%p").time()
+            end_time = datetime.strptime(end_time, "%I:%M%p").time()
+            parsed_hours.append((start_time, end_time))
 
-    parsed_locations[places["location"].lower()] = parsed_hours
+        parsed_locations[places["location"].lower()] = parsed_hours
+
+except:
+    EVERYTHING_OPEN = True
 
 DATA = {"date": today, "data": parsed_locations}
 
@@ -156,7 +164,9 @@ class recommendation:
         Input: list of locations
         Output: list of locations that are open
         """
-
+        if EVERYTHING_OPEN == True:
+            return locs
+        
         open_locs = []
         current_time = self.time
         api_data = DATA["data"]
@@ -170,14 +180,50 @@ class recommendation:
                         break 
 
         return open_locs
+    
+    def _point_to_segment_distance(self, point: tuple, seg_start: tuple, seg_end: tuple) -> float:
+       
+        """
+        Finds the perpendicular distance from a point to a line segment using Shapely.
+        Automatically clamps projection to segment bounds, so points that fall before
+        or beyond the segment endpoints are measured to the nearest endpoint instead.
+        Input: tuple of the point, tuple of the segment start, tuple of the segment end
+        Output: meters as float
+        """
+
+        shapely_point = Point(point[1], point[0])
+        shapely_seg   = LineString([(seg_start[1], seg_start[0]),
+                                    (seg_end[1],   seg_end[0])])
+        deg_dist = shapely_point.distance(shapely_seg)
+        return geodesic(point, (point[0] + deg_dist, point[1])).m
+
+    def _score_location(self, loc_coord: tuple, center_of_interest: tuple, radius: float, corridor_weight: float = 0.6, distance_weight: float = 0.4) -> float:
+
+        """
+        Scores a location based on how well it lies along the path from the user to the
+        center of interest. Combines perpendicular distance from the user->destination
+        corridor and raw distance from the user. Lower score = higher priority.
+        Input: location coordinate as tuple, center of interest as tuple, search radius as float, optional corridor and distance weights as floats (default 0.6 / 0.4)
+        Output: score as float
+        """
+         
+        perp_dist = self._point_to_segment_distance(loc_coord, self.current_location, center_of_interest)
+        raw_dist  = self._calc_distance(self.current_location, loc_coord)
+        norm_perp = min(perp_dist / radius, 1.0)
+        norm_dist = min(raw_dist  / radius, 1.0)
+        return corridor_weight * (norm_perp ** 2) + distance_weight * norm_dist
 
     def recommend(self, center_of_interest: tuple, radius: float) -> list:
 
         """
-        Recommends the places that the user can eat. Current methodology: Finds places within specified search circle, filters the locations by user restriction, then sorts by distance from user.
+        Recommends the places that the user can eat. Current methodology: Finds places within
+        specified search circle, filters by open hours and user restriction, then sorts by
+        corridor score which prioritizes locations along the path from the user to the center
+        of interest.
         Limitations: If no places within search circle fit the user's needs, it returns nothing.
         Input: center_of_interest as a tuple (lat, long), radius as a float in meters
-        Output: Recommended places to eat as a list of dictionaries. Dictionary structure: {'name': name, 'cuisine': cuisine, 'restriction': restriction, 'distance': distance from user}
+        Output: Recommended places to eat as a list of dictionaries. Dictionary structure:
+                {'name': name, 'cuisine': cuisine, 'restriction': restriction, 'distance': distance from user, 'score': corridor score}
         """
 
         recom_locs = []
@@ -186,18 +232,24 @@ class recommendation:
             return recom_locs
 
         for location in ALL_FOOD_LOCATIONS:
-
-            name, coord, cuisine, restriction = location["name"], (location["latitude"], location["longitude"]), location["cuisine"], location["restriction"]
+            name = location["name"]
+            coord = (location["latitude"], location["longitude"])
+            cuisine = location["cuisine"]
+            restriction = location["restriction"]
 
             if self._within_radius(center_of_interest, coord, radius):
-
-                recom_locs.append({'name': name, 'cuisine': cuisine, 'restriction': restriction, 'distance': self._calc_distance(self.current_location, coord)})
+                score = self._score_location(coord, center_of_interest, radius)
+                recom_locs.append({
+                    'name': name,
+                    'cuisine': cuisine,
+                    'restriction': restriction,
+                    'distance': self._calc_distance(self.current_location, coord),
+                    'score': score
+                })
 
         recom_locs = self._find_is_open(recom_locs)
-
         recom_locs = self._filter_by_restriction(recom_locs)
-
-        recom_locs.sort(key=lambda x: x['distance'])
+        recom_locs.sort(key=lambda x: x['score'])
 
         return recom_locs
 
