@@ -135,29 +135,6 @@ Resources:
       DockerBuildArgs:
         TARGETPLATFORM: "linux/amd64"
 
-  # --- Menu Scrapes Merger Function --- #
-  MenuMergeFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Runtime: python3.11
-      Handler: scrapers.menu_merger.handler
-      CodeUri: .
-      Description: Scheduled menu merger from menu scrapes
-      Events:
-        ScheduleEvent:
-          Type: ScheduleV2
-          Properties:
-            # "Run at exactly 3:00 AM every day"
-            ScheduleExpression: "cron(0 3 * * ? *)"
-            # Locks it to Central Time (handles CST/CDT shifts automatically)
-            ScheduleExpressionTimezone: "America/Chicago"
-            State: ENABLED
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref DynamoDBTable
-        - S3CrudPolicy:
-            BucketName: !Ref S3Bucket
-
   # --- DynamoDB Table ---
   DynamoDBTable:
     Type: AWS::DynamoDB::Table
