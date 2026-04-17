@@ -53,9 +53,12 @@ class recommendation:
     }
     
 
-    def __init__(self, current_location: tuple, user_id: str, restriction: str = None, time: str = None):
+    def __init__(self, current_location: tuple, user_id: str, dietary_preferences: list = None, allergies: list = None, time: str = None):
         self.current_location = current_location
-        self.restriction = restriction # Currently this method, but in future this will be populated using user id
+        self.user_id = user_id
+        self.dietary_preferences = dietary_preferences or []
+        self.allergies = allergies or []
+
         if time == None or time == "":
             self.time = datetime.now().time()
         else:
@@ -80,7 +83,7 @@ class recommendation:
         #########            TODO: Add logic to get the restrictions of the user and                #########            
         #########                   the time they have to get food                                  #########
         #####################################################################################################
-
+        
         return restriction   
 
 
@@ -117,45 +120,45 @@ class recommendation:
         return self.TAMU_BOUNDS['south'] <= lat <= self.TAMU_BOUNDS['north'] and self.TAMU_BOUNDS['west'] <= long <= self.TAMU_BOUNDS['east']
     
 
-    def _filter_by_restriction(self, locations: list) -> list:
-
+    def _filter_by_restrictions(self, locations: list) -> list:
         """
         Filters down the location recommendations to only those that fit the user
         Input: list of locations
         Output: List of locations that fits the users needs
         """
-        
-        new_locs = []
-
-        if self.restriction == "vegetarian":
-            for location in locations:
-                if location["restriction"].startswith("vegetarian") or location["restriction"].startswith("vegan"):
-                    new_locs.append(location)
-        
-        elif self.restriction == "vegan":
-            for location in locations:
-                if location["restriction"].startswith("vegan"):
-                    new_locs.append(location)
-
-        elif self.restriction == "chicken":
-            for location in locations:
-                if location["restriction"].endswith("chicken"):
-                    new_locs.append(location)
-
-        elif self.restriction == "beef":
-            for location in locations:
-                if location["restriction"].endswith("beef"):
-                    new_locs.append(location)
-        
-        elif self.restriction == "meat":
-            for location in locations:
-                if location["restriction"].startswith("meat"):
-                    new_locs.append(location)
-
-        else:
-            new_locs = locations
-        
-        return new_locs
+        if not getattr(self, 'dietary_preferences', None) and not getattr(self, 'allergies', None):
+            return locations
+            
+        filtered_locs = []
+        for loc in locations:
+            # Gather location properties
+            loc_dietary = loc.get("dietary", [])
+            loc_allergens = loc.get("allergens", [])
+            
+            # 1. Allergies: If the location has an allergen the user is allergic to, skip it entirely
+            if getattr(self, 'allergies', None):
+                conflict = any(allergy in loc_allergens for allergy in self.allergies)
+                if conflict:
+                    continue  # unsafe
+                    
+            # 2. Dietary: Ensure location satisfies ALL user dietary preferences,
+            #    or at least any strictest requirements. We check if the location's
+            #    dietary list intersects with the required ones.
+            #   (e.g., if user wants Halal and Vegan, the location must support both)
+            safe = True
+            if getattr(self, 'dietary_preferences', None):
+                for req in self.dietary_preferences:
+                    if req not in loc_dietary:
+                        # Fallback for "Vegan" implying "Vegetarian" and "Dairy-Free"
+                        if req == "Vegetarian" and "Vegan" in loc_dietary:
+                            continue
+                        safe = False
+                        break
+                        
+            if safe:
+                filtered_locs.append(loc)
+                
+        return filtered_locs
     
     def _find_is_open(self, locs: list) -> list:
 
@@ -248,7 +251,7 @@ class recommendation:
                 })
 
         recom_locs = self._find_is_open(recom_locs)
-        recom_locs = self._filter_by_restriction(recom_locs)
+        recom_locs = self._filter_by_restrictions(recom_locs)
         recom_locs.sort(key=lambda x: x['score'])
 
         return recom_locs

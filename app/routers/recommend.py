@@ -15,7 +15,8 @@ def get_recommendations(req: RecommendationRequest):
         rec_engine = recommendation(
             current_location=curr_loc,
             user_id=req.user_id,
-            restriction=req.restriction,
+            dietary_preferences=req.dietary_preferences,
+            allergies=req.allergies,
             time=req.time
         )
 

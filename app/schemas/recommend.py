@@ -11,7 +11,8 @@ class RecommendationRequest(BaseModel):
     center_of_interest: Coordinates
     radius: float
     user_id: str
-    restriction: str | None = None
+    dietary_preferences: list[str] | None = None
+    allergies: list[str] | None = None
     time: str | None = None
 
 
