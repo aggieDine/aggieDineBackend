@@ -24,7 +24,7 @@ os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/ms-playwright"
 # ---------------------------------------------------------------------------
 URL = "https://dineoncampus.com/tamu/hours-of-operation"
 
-WEBSHARE_CREDENTIALS = "sqhmhfry:to40ugbwi9ea"
+WEBSHARE_CREDENTIALS = os.environ.get("WEBSHARE_CREDENTIALS")
 WEBSHARE_IPS = [
     "31.59.20.176:6754",
     "23.95.150.145:6114",

@@ -16,7 +16,9 @@ Globals:
         AWS_COGNITO_REGION: !Ref AWS::Region
         AWS_COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
         AWS_COGNITO_APP_CLIENT_ID: !Ref CognitoAppClientId
-        SCRAPERAPI_KEY: !Ref ScraperApiKey
+        FIREBASE_CREDENTIALS: '{{resolve:ssm:/my-app/firebase-credentials:1}}'
+        WEBSHARE_CREDENTIALS: '{{resolve:ssm:/my-app/webshare-credentials:1}}'
+        PROXY_URL: '{{resolve:ssm:/my-app/webshare-proxy-url:1}}'
 
 Parameters:
   ServiceName:
@@ -38,10 +40,6 @@ Parameters:
   CognitoAppClientId:
     Type: String
     Default: ""
-  ScraperApiKey:
-    Type: String
-    Description: "API Key for ScraperAPI"
-    NoEcho: true # This hides the key from AWS logs!
 
 Resources:
   # --- API Gateway ---

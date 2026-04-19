@@ -44,12 +44,45 @@ app.include_router(hours.router)
 '''
 ** Example Requests: **
 GET /hours?date=2026-04-06
-GET /hours?date=2026-04-06
+GET /hours?date=2026-04-07
 
 --- Real URL Example ---
 https://nh19d71sp8.execute-api.us-east-2.amazonaws.com/hours?date=2026-04-06
 
 Hours are available up until including the day a week from current day
+'''
+
+from app.routers import event
+app.include_router(event.router)
+
+'''
+** Example Requests: **
+POST /events
+GET /events
+GET /events?date=2026-04-18
+GET /events?hours_window=48
+GET /events/evt_019?event_time=2026-04-18T20:00:00Z
+PUT /events/evt_019?event_time=2026-04-18T20:00:00Z
+DELETE /events/evt_019?event_time=2026-04-18T20:00:00Z
+
+--- Real URL Example ---
+https://nh19d71sp8.execute-api.us-east-2.amazonaws.com/events?date=2026-04-18
+
+If no date is provided, GET /events returns events for the next 24 hours. Single-event operations (GET, PUT, DELETE) strictly require the 'event_time' ISO string query parameter to locate the item in DynamoDB. All endpoints require an authenticated user.
+'''
+
+from app.routers import user_token
+app.include_router(user_token.router)
+
+'''
+** Example Requests: **
+POST /user/register-device
+POST /user/unregister-device
+
+--- Real URL Example ---
+https://nh19d71sp8.execute-api.us-east-2.amazonaws.com/user/register-device
+
+Endpoints require an authenticated user. Expects a JSON body containing {"device_token": "string"} to connect or disconnect the user's mobile device from Firebase silent notifications.
 '''
 
 
