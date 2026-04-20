@@ -8,6 +8,7 @@ class EventCreate(BaseModel):
     time:            datetime
     is_private:      bool = False
     invited_users:   list[str] = []  # list of user IDs
+    message: str | None = None
 
 
 class EventUpdate(BaseModel):
@@ -15,6 +16,7 @@ class EventUpdate(BaseModel):
     time:            datetime | None = None
     is_private:      bool | None = None
     invited_users:   list[str] | None = None  # replaces entire list
+    message: str | None = None
 
 
 class EventResponse(BaseModel):
@@ -26,6 +28,7 @@ class EventResponse(BaseModel):
     created_by:      str
     created_at:      datetime
     updated_at:      datetime
+    message: str | None = None
 
 
 class EventList(BaseModel):

@@ -31,6 +31,7 @@ def _format_event(item: dict) -> dict:
         "created_by":    item["created_by"],
         "created_at":    item["created_at"],
         "updated_at":    item["updated_at"],
+        "message":       item["message"]
     }
 
 
@@ -50,6 +51,7 @@ def create_event(table, data: EventCreate, user_id: str) -> dict:
         "created_by":   user_id,
         "created_at":   now,
         "updated_at":   now,
+        "message":      data.message
     }
     table.put_item(Item=item)
     return _format_event(item)
