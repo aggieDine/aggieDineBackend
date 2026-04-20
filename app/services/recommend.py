@@ -126,39 +126,42 @@ class recommendation:
         Input: list of locations
         Output: List of locations that fits the users needs
         """
-        if not getattr(self, 'dietary_preferences', None) and not getattr(self, 'allergies', None):
-            return locations
-            
-        filtered_locs = []
-        for loc in locations:
-            # Gather location properties
-            loc_dietary = loc.get("dietary", [])
-            loc_allergens = loc.get("allergens", [])
-            
-            # 1. Allergies: If the location has an allergen the user is allergic to, skip it entirely
-            if getattr(self, 'allergies', None):
-                conflict = any(allergy in loc_allergens for allergy in self.allergies)
-                if conflict:
-                    continue  # unsafe
-                    
-            # 2. Dietary: Ensure location satisfies ALL user dietary preferences,
-            #    or at least any strictest requirements. We check if the location's
-            #    dietary list intersects with the required ones.
-            #   (e.g., if user wants Halal and Vegan, the location must support both)
-            safe = True
-            if getattr(self, 'dietary_preferences', None):
-                for req in self.dietary_preferences:
-                    if req not in loc_dietary:
-                        # Fallback for "Vegan" implying "Vegetarian" and "Dairy-Free"
-                        if req == "Vegetarian" and "Vegan" in loc_dietary:
-                            continue
-                        safe = False
-                        break
-                        
-            if safe:
-                filtered_locs.append(loc)
-                
-        return filtered_locs
+        # TODO: Uncomment this logic when user preferences are accessible
+        return locations
+
+        # if not getattr(self, 'dietary_preferences', None) and not getattr(self, 'allergies', None):
+        #     return locations
+        #     
+        # filtered_locs = []
+        # for loc in locations:
+        #     # Gather location properties
+        #     loc_dietary = loc.get("dietary", [])
+        #     loc_allergens = loc.get("allergens", [])
+        #     
+        #     # 1. Allergies: If the location has an allergen the user is allergic to, skip it entirely
+        #     if getattr(self, 'allergies', None):
+        #         conflict = any(allergy in loc_allergens for allergy in self.allergies)
+        #         if conflict:
+        #             continue  # unsafe
+        #             
+        #     # 2. Dietary: Ensure location satisfies ALL user dietary preferences,
+        #     #    or at least any strictest requirements. We check if the location's
+        #     #    dietary list intersects with the required ones.
+        #     #   (e.g., if user wants Halal and Vegan, the location must support both)
+        #     safe = True
+        #     if getattr(self, 'dietary_preferences', None):
+        #         for req in self.dietary_preferences:
+        #             if req not in loc_dietary:
+        #                 # Fallback for "Vegan" implying "Vegetarian" and "Dairy-Free"
+        #                 if req == "Vegetarian" and "Vegan" in loc_dietary:
+        #                     continue
+        #                 safe = False
+        #                 break
+        #                 
+        #     if safe:
+        #         filtered_locs.append(loc)
+        #         
+        # return filtered_locs
     
     def _find_is_open(self, locs: list) -> list:
 
