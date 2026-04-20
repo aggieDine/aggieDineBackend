@@ -1,25 +1,23 @@
 """
 Lambda handler for scheduled TAMU dining menu scraping.
 Triggered by EventBridge every day at 2:00am (configured in template.yaml).
-
-Dependencies (add to your Lambda layer or requirements.txt):
-  - curl_cffi
 """
 
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 import random
 
 import boto3
-from curl_cffi import requests
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-BASE_API  = "https://apiv4.dineoncampus.com"
-SITE_ID   = "5751fd4290975b60e0489534"
+BASE_API_V1 = "https://api.dineoncampus.com"
+BASE_API_V4 = "https://apiv4.dineoncampus.com"
+SITE_ID     = "5751fd4290975b60e0489534"
 
 # 1. Format the ScraperAPI URL
 # SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "YOUR_API_KEY_HERE")
@@ -51,10 +49,6 @@ session.headers.update({
     "Accept":             "application/json, text/plain, */*",
     "Accept-Language":    "en-US,en;q=0.9",
     "Referer":            "https://dineoncampus.com/",
-    "User-Agent":         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
-    "sec-ch-ua":          '"Chromium";v="147", "Not.A/Brand";v="8"',
-    "sec-ch-ua-mobile":   "?0",
-    "sec-ch-ua-platform": '"macOS"',
 })
 
 # ---------------------------------------------------------------------------
@@ -86,8 +80,19 @@ def _get(url: str, retries=3) -> dict:
                 return {}
 
 def fetch_locations() -> list:
-    url  = f"{BASE_API}/sites/{SITE_ID}/locations-public?for_menus=true"
-    data = _get(url)
+    # Try V1 first, fall back to V4
+    url_v1 = f"{BASE_API_V1}/v1/locations/all_locations?platform=0&site_id={SITE_ID}&for_menus=true&with_buildings=true"
+    data = _get(url_v1)
+    if data:
+        locations = []
+        for building in data.get("buildings", []):
+            locations.extend(building.get("locations", []))
+        if locations:
+            return locations
+
+    print("[Fallback] V1 failed, trying V4...")
+    url_v4 = f"{BASE_API_V4}/sites/{SITE_ID}/locations-public?for_menus=true"
+    data = _get(url_v4)
     locations = []
     for building in data.get("buildings", []):
         locations.extend(building.get("locations", []))
@@ -95,17 +100,31 @@ def fetch_locations() -> list:
 
 
 def fetch_periods(location_id: str, date_str: str) -> list:
-    url  = f"{BASE_API}/locations/{location_id}/periods/?date={date_str}"
+    url = f"{BASE_API_V1}/v1/location/{location_id}/periods?platform=0&date={date_str}"
     data = _get(url)
-    time.sleep(REQUEST_DELAY_SECONDS)
+    if data.get("periods"):
+        return data["periods"]
+
+    url = f"{BASE_API_V4}/locations/{location_id}/periods/?date={date_str}"
+    data = _get(url)
     return data.get("periods", [])
 
 
 def fetch_menu(location_id: str, period_id: str, date_str: str) -> dict:
-    url  = f"{BASE_API}/locations/{location_id}/menu?date={date_str}&period={period_id}"
+    url = f"{BASE_API_V1}/v1/location/{location_id}/periods/{period_id}?platform=0&date={date_str}"
     data = _get(url)
-    time.sleep(REQUEST_DELAY_SECONDS)
-    return data
+    if data:
+        return data
+
+    url = f"{BASE_API_V4}/locations/{location_id}/menu?date={date_str}&period={period_id}"
+    return _get(url)
+
+
+def is_open(location: dict) -> bool:
+    status = location.get("status", {})
+    if isinstance(status, dict):
+        return status.get("label", "").lower() == "open"
+    return False
 
 
 def is_closed(menu_data: dict) -> bool:
@@ -149,6 +168,49 @@ def parse_menu_items(menu_data: dict) -> list:
 
 
 # ---------------------------------------------------------------------------
+# Parallel fetch helpers
+# ---------------------------------------------------------------------------
+
+def _fetch_location_periods(location: dict, today: str) -> dict:
+    """Fetch periods for a single location. Returns location info + periods."""
+    loc_id   = str(location.get("id") or location.get("_id", ""))
+    loc_name = location.get("name", "Unknown")
+    if not loc_id:
+        return None
+    try:
+        periods = fetch_periods(loc_id, today)
+        return {"loc_id": loc_id, "loc_name": loc_name, "periods": periods}
+    except Exception as e:
+        print(f"[Error] periods for {loc_name}: {e}")
+        return None
+
+
+def _fetch_menu_entry(loc_id: str, loc_name: str, period: dict, today: str) -> dict:
+    """Fetch and parse menu for a single location+period. Returns menu entry or None."""
+    period_id   = str(period.get("id") or period.get("_id", ""))
+    period_name = period.get("name", "Unknown Period")
+    if not period_id:
+        return None
+    try:
+        menu_data = fetch_menu(loc_id, period_id, today)
+        if is_closed(menu_data):
+            return {"skipped": True}
+        items = parse_menu_items(menu_data)
+        return {
+            "location_id":   loc_id,
+            "location_name": loc_name,
+            "date":          today,
+            "period_id":     period_id,
+            "period_name":   period_name,
+            "item_count":    len(items),
+            "items":         items,
+        }
+    except Exception as e:
+        print(f"[Error] menu for {loc_name}/{period_name}: {e}")
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Lambda entry point
 # ---------------------------------------------------------------------------
 
@@ -172,33 +234,48 @@ def handler(event, context):
         print("No locations returned — aborting.")
         return {"statusCode": 500, "body": json.dumps({"error": "no locations"})}
 
-    # ---- 2. Loop locations → periods → items ------------------------------
+    print(f"Found {len(locations)} locations")
+
+    # ---- 2. Fetch periods in parallel ------------------------------------
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        period_futures = {
+            executor.submit(_fetch_location_periods, loc, today): loc
+            for loc in locations
+        }
+        location_periods = []
+        for future in as_completed(period_futures):
+            result = future.result()
+            if result and result["periods"]:
+                location_periods.append(result)
+
+    print(f"Fetched periods for {len(location_periods)} locations")
+
+    # ---- 3. Fetch menus in parallel --------------------------------------
     all_menus   = []
     total_items = 0
     skipped     = 0
 
-    for location in locations:
-        loc_id   = str(location.get("id") or location.get("_id", ""))
-        loc_name = location.get("name", "Unknown")
-        if not loc_id:
-            continue
+    menu_tasks = []
+    for lp in location_periods:
+        for period in lp["periods"]:
+            menu_tasks.append((lp["loc_id"], lp["loc_name"], period, today))
 
-        periods = fetch_periods(loc_id, today)
-
-        for period in periods:
-            period_id   = str(period.get("id") or period.get("_id", ""))
-            period_name = period.get("name", "Unknown Period")
-            if not period_id:
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        menu_futures = {
+            executor.submit(_fetch_menu_entry, *task): task
+            for task in menu_tasks
+        }
+        for future in as_completed(menu_futures):
+            result = future.result()
+            if result is None:
                 continue
-
-            menu_data = fetch_menu(loc_id, period_id, today)
-
-            if is_closed(menu_data):
+            if result.get("skipped"):
                 skipped += 1
                 continue
+            total_items += result["item_count"]
+            all_menus.append(result)
 
-            items = parse_menu_items(menu_data)
-            total_items += len(items)
+            print(f"Fetched {len(all_menus)} menus, {total_items} items, skipped {skipped} closed")
 
 
             all_menus.append({
@@ -233,7 +310,7 @@ def handler(event, context):
     )
     print(f"Wrote to s3://{bucket_name}/{s3_key}")
 
-    # ---- 5. Write summary record to DynamoDB ------------------------------
+    # ---- 6. Write summary record to DynamoDB ------------------------------
     table.put_item(
         Item={
             "PK":                  "SCRAPE#latest",
@@ -259,3 +336,8 @@ def handler(event, context):
             "skipped_closed": skipped,
         }),
     }
+
+
+if __name__ == "__main__":
+    result = handler({}, None)
+    print(result)
