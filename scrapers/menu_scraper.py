@@ -1,9 +1,6 @@
 """
 Lambda handler for scheduled TAMU dining menu scraping.
-Triggered by EventBridge every 30 minutes (configured in template.yaml).
-
-Dependencies (add to your Lambda layer or requirements.txt):
-  - cloudscraper
+Triggered by EventBridge every day at 2:00am (configured in template.yaml).
 """
 
 import json
@@ -11,9 +8,9 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
+import random
 
 import boto3
-import cloudscraper
 
 # ---------------------------------------------------------------------------
 # Config
@@ -22,11 +19,31 @@ BASE_API_V1 = "https://api.dineoncampus.com"
 BASE_API_V4 = "https://apiv4.dineoncampus.com"
 SITE_ID     = "5751fd4290975b60e0489534"
 
-REQUEST_DELAY_SECONDS = 0.3
-MAX_WORKERS = 5
+# 1. Format the ScraperAPI URL
+# SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "YOUR_API_KEY_HERE")
+# Note: Requires http:// at the front for request libraries
 
-session = cloudscraper.create_scraper(
-    browser={"browser": "chrome", "platform": "darwin", "mobile": False},
+PROXY_URL = os.environ.get("PROXY_URL")
+
+WEBSHARE_CREDENTIALS = os.environ.get("WEBSHARE_CREDENTIALS")
+WEBSHARE_IPS = [
+    "31.59.20.176:6754",
+    "23.95.150.145:6114",
+    "198.23.239.134:6540",
+    "45.38.107.97:6014",
+    "107.172.163.27:6543",
+    "198.105.121.200:6462",
+    "216.10.27.159:6837",
+    "142.111.67.146:5611",
+    "191.96.254.138:6185",
+    "31.58.9.4:6077"
+]
+
+REQUEST_DELAY_SECONDS = 1
+
+session = requests.Session(
+    impersonate="chrome110",
+    verify=False # Keep this here! Webshare needs it just like ScraperAPI did
 )
 session.headers.update({
     "Accept":             "application/json, text/plain, */*",
@@ -38,16 +55,29 @@ session.headers.update({
 # API helpers
 # ---------------------------------------------------------------------------
 
-def _get(url: str) -> dict:
-    try:
-        time.sleep(REQUEST_DELAY_SECONDS)
-        resp = session.get(url, timeout=10)
-        resp.raise_for_status()
-        return resp.json()
-    except Exception as e:
-        print(f"[Error] {url}: {e}")
-        return {}
-
+def _get(url: str, retries=3) -> dict:
+    for attempt in range(retries):
+        # 1. Pick a random IP from your list for this attempt
+        proxy_ip = random.choice(WEBSHARE_IPS)
+        proxy_url = f"http://{WEBSHARE_CREDENTIALS}@{proxy_ip}"
+        
+        try:
+            # 2. Inject the specific proxy directly into the request
+            resp = session.get(
+                url, 
+                timeout=120, 
+                proxies={"http": proxy_url, "https": proxy_url}
+            )
+            resp.raise_for_status()
+            return resp.json()
+            
+        except Exception as e:
+            print(f"[Warning] Attempt {attempt + 1} failed for {url} using {proxy_ip}: {e}")
+            if attempt < retries - 1:
+                time.sleep(3) 
+            else:
+                print(f"[Error] Final failure for {url}. Skipping.")
+                return {}
 
 def fetch_locations() -> list:
     # Try V1 first, fall back to V4
@@ -107,21 +137,31 @@ def parse_menu_items(menu_data: dict) -> list:
     for category in categories:
         station = category.get("name", "Unknown Station")
         for item in category.get("items", []):
-            allergens = [f["name"] for f in item.get("filters", []) if f.get("type") == "allergen"]
-            labels    = [f["name"] for f in item.get("filters", []) if f.get("type") == "label"]
+            # All filters (allergens, diet labels, etc.) — no type field exists
+            filters = [f["name"] for f in item.get("filters", [])]
+            calories_raw = item.get("calories", "")
+            calories = int(calories_raw) if calories_raw != "" and calories_raw is not None else None
+            
             nutrients = [
-                {"name": n.get("name"), "value": n.get("value"), "unit": n.get("uom")}
+                {
+                    "name":          n.get("name"),
+                    "value":         n.get("value"),
+                    "unit":          n.get("uom"),
+                    "value_numeric": n.get("valueNumeric"),
+                }
                 for n in item.get("nutrients", [])
+                if n.get("value") and n.get("value") != "-"  # skip empty values
             ]
+
             items.append({
+                "id":          item.get("id", ""),
                 "name":        item.get("name", ""),
                 "station":     station,
                 "description": item.get("desc", ""),
                 "portion":     item.get("portion", ""),
                 "ingredients": item.get("ingredients", ""),
-                "calories":    item.get("calories", ""),
-                "allergens":   allergens,
-                "labels":      labels,
+                "calories": calories,
+                "filters":     filters,   # contains allergens + diet labels + icons
                 "nutrients":   nutrients,
             })
     return items
@@ -235,9 +275,20 @@ def handler(event, context):
             total_items += result["item_count"]
             all_menus.append(result)
 
-    print(f"Fetched {len(all_menus)} menus, {total_items} items, skipped {skipped} closed")
+            print(f"Fetched {len(all_menus)} menus, {total_items} items, skipped {skipped} closed")
 
-    # ---- 4. Build final payload -------------------------------------------
+
+            all_menus.append({
+                "location_id":      loc_id,
+                "location_name":    loc_name,
+                "date":             today,
+                "period_id":        period_id,
+                "period_name":      period_name,
+                "item_count":       len(items),
+                "items":            items,
+            })
+
+    # ---- 3. Build final payload -------------------------------------------
     scraped_data = {
         "scraped_at":          now_iso,
         "source":              "dineoncampus.com/tamu",
@@ -249,8 +300,8 @@ def handler(event, context):
         "menus":               all_menus,
     }
 
-    # ---- 5. Write full JSON blob to S3 ------------------------------------
-    s3_key = f"scrapes/{today}/{now_iso}.json"
+    # ---- 4. Write full JSON blob to S3 ------------------------------------
+    s3_key = f"scrapes/menu/{today}/{now_iso}.json"
     s3.put_object(
         Bucket=bucket_name,
         Key=s3_key,

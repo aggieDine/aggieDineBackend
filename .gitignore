@@ -26,3 +26,6 @@ serviceAccountKey.json
 .coverage
 htmlcov/
 .pytest_cache/
+*.json 
+scrapers/non-production/
+test_menu.py

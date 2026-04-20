@@ -36,6 +36,14 @@ async def verify_cognito_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
     token = credentials.credentials
+    #temporary bypass for dev login
+    if token == "dummy.dev.token":
+        return {
+            "sub": "dev-12345",
+            "email": "dev@tamu.edu",
+            "cognito:groups": ["developers"]
+        }
+    
     try:
         jwks = await _get_jwks()
         public_key = _get_public_key(token, jwks)
@@ -67,3 +75,7 @@ async def get_current_user(
         "email": claims.get("email"),
         "groups": claims.get("cognito:groups", []),
     }
+
+
+
+
