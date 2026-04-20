@@ -4,8 +4,7 @@ Description: AggieDine Serverless Service Template
 
 Globals:
   Function:
-    Timeout: 30
-    Runtime: python3.11
+    Timeout: 900
     MemorySize: 256
     Environment:
       Variables:
@@ -17,11 +16,14 @@ Globals:
         AWS_COGNITO_REGION: !Ref AWS::Region
         AWS_COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
         AWS_COGNITO_APP_CLIENT_ID: !Ref CognitoAppClientId
+        FIREBASE_CREDENTIALS: '{{resolve:ssm:/my-app/firebase-credentials:1}}'
+        WEBSHARE_CREDENTIALS: '{{resolve:ssm:/my-app/webshare-credentials:1}}'
+        PROXY_URL: '{{resolve:ssm:/my-app/webshare-proxy-url:1}}'
 
 Parameters:
   ServiceName:
     Type: String
-    Default: template-serverless-service
+    Default: aggiedine-backend-service
   Environment:
     Type: String
     Default: development
@@ -57,7 +59,8 @@ Resources:
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: app/handler.handler
+      Runtime: python3.11
+      Handler: app.handler.handler
       CodeUri: .
       Description: FastAPI application served via Mangum
       Events:
@@ -79,24 +82,58 @@ Resources:
         - S3CrudPolicy:
             BucketName: !Ref S3Bucket
 
-  # --- Scraper Lambda ---
-  ScraperFunction:
+  # --- Menu Scraper Lambda ---
+  MenuScraperFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: scrapers/menu_scraper.handler
+      Runtime: python3.11
+      Handler: scrapers.menu_scraper.handler
       CodeUri: .
+      Timeout: 180
+      MemorySize: 512
       Description: Scheduled menu scraper
+      Layers:
+       - arn:aws:lambda:us-east-2:348117807129:layer:curl-cffi:4
       Events:
         ScheduleEvent:
-          Type: Schedule
+          Type: ScheduleV2
           Properties:
-            Schedule: rate(30 minutes)
-            Enabled: true
+            # "Run at exactly 2:00 AM every day"
+            ScheduleExpression: "cron(0 2 * * ? *)"
+            # Locks it to Central Time (handles CST/CDT shifts automatically)
+            ScheduleExpressionTimezone: "America/Chicago"
+            State: ENABLED
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref DynamoDBTable
         - S3CrudPolicy:
             BucketName: !Ref S3Bucket
+
+  # --- Hours Scraper Lambda ---
+  HoursScraperFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      MemorySize: 2048 
+      Timeout: 900
+      Events:
+        ScheduleEvent:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 2 * * ? *)"
+            ScheduleExpressionTimezone: "America/Chicago"
+            State: ENABLED
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+        - S3CrudPolicy:
+            BucketName: !Ref S3Bucket
+    Metadata:
+      Dockerfile: Dockerfile
+      DockerContext: .
+      DockerTag: hours-scraper
+      DockerBuildArgs:
+        TARGETPLATFORM: "linux/amd64"
 
   # --- DynamoDB Table ---
   DynamoDBTable:

@@ -59,3 +59,4 @@ def delete_item(
     deleted = item_service.delete_item(table, item_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Item not found")
+
