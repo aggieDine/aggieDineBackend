@@ -1,0 +1,9 @@
+ILCB Food Truck (Central Campus), 30.6124, -96.3431, Rotating Food Truck, meat_mixed
+Food Truck Row (East Campus), 30.6206, -96.3403, Rotating Food Trucks, meat_mixed
+ILSQ Food Truck (West Campus), 30.6113, -96.3461, Rotating Food Truck, meat_mixed
+
+
+
+
+
+Currently unused, as locations and times change often

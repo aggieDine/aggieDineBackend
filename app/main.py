@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import example, health
+from app.routers import example, health, recommend
 from app.routers import menu
 from app.routers import hours
 
@@ -21,6 +21,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(example.router)
+app.include_router(recommend.router)
 
 app.include_router(menu.router)
 

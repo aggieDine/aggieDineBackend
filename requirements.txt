@@ -11,6 +11,12 @@ pytest==8.3.4
 pytest-asyncio==0.25.0
 moto[dynamodb,s3]==5.0.27
 
+# Recommendation
+geopy==2.4.1
+requests==2.32.3
+shapely==2.0.6
+rich==13.9.4
+
 #Firebase
 anyio==4.13.0
 CacheControl==0.14.4

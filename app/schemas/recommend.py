@@ -1,0 +1,29 @@
+from pydantic import BaseModel
+
+
+class Coordinates(BaseModel):
+    lat: float
+    lon: float
+
+
+class RecommendationRequest(BaseModel):
+    current_location: Coordinates
+    center_of_interest: Coordinates
+    radius: float
+    user_id: str
+    dietary_preferences: list[str] | None = None
+    allergies: list[str] | None = None
+    time: str | None = None
+
+
+class RecommendationItem(BaseModel):
+    name: str
+    cuisine: str
+    restriction: str
+    distance: float
+    score: float
+
+
+class RecommendationResponse(BaseModel):
+    status: str
+    results: list[RecommendationItem]
