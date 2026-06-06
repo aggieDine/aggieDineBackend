@@ -9,6 +9,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 import random
+from curl_cffi import requests
 
 import boto3
 
@@ -22,8 +23,7 @@ SITE_ID     = "5751fd4290975b60e0489534"
 # 1. Format the ScraperAPI URL
 # SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "YOUR_API_KEY_HERE")
 # Note: Requires http:// at the front for request libraries
-
-PROXY_URL = os.environ.get("PROXY_URL")
+# PROXY_URL = os.environ.get("PROXY_URL")
 
 WEBSHARE_CREDENTIALS = os.environ.get("WEBSHARE_CREDENTIALS")
 WEBSHARE_IPS = [
@@ -50,6 +50,8 @@ session.headers.update({
     "Accept-Language":    "en-US,en;q=0.9",
     "Referer":            "https://dineoncampus.com/",
 })
+
+MAX_WORKERS = 5
 
 # ---------------------------------------------------------------------------
 # API helpers
@@ -277,16 +279,6 @@ def handler(event, context):
 
             print(f"Fetched {len(all_menus)} menus, {total_items} items, skipped {skipped} closed")
 
-
-            all_menus.append({
-                "location_id":      loc_id,
-                "location_name":    loc_name,
-                "date":             today,
-                "period_id":        period_id,
-                "period_name":      period_name,
-                "item_count":       len(items),
-                "items":            items,
-            })
 
     # ---- 3. Build final payload -------------------------------------------
     scraped_data = {

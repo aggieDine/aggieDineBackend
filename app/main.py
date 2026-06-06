@@ -76,6 +76,7 @@ from app.routers import user_token
 app.include_router(user_token.router)
 
 '''
+FCM
 ** Example Requests: **
 POST /user/register-device
 POST /user/unregister-device
@@ -84,6 +85,13 @@ POST /user/unregister-device
 https://nh19d71sp8.execute-api.us-east-2.amazonaws.com/user/register-device
 
 Endpoints require an authenticated user. Expects a JSON body containing {"device_token": "string"} to connect or disconnect the user's mobile device from Firebase silent notifications.
+'''
+
+from app.routers import user
+app.include_router(user.router)
+
+'''
+User 
 '''
 
 

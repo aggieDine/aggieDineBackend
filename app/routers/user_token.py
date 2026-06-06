@@ -5,7 +5,7 @@ from app.dependencies import get_dynamodb_table
 from app.middleware.auth import get_current_user
 from app.fcm import register_device_token, unregister_device_token
 
-router = APIRouter(prefix="/user", tags=["user"])
+router = APIRouter(prefix="/userfcm", tags=["user"])
 
 
 class DeviceTokenRequest(BaseModel):
