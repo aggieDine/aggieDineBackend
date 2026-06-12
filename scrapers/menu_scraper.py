@@ -13,6 +13,37 @@ from curl_cffi import requests
 
 import boto3
 
+import urllib.request
+
+WEBSHARE_PROXY_LIST_URL = "https://proxy.webshare.io/api/v2/proxy/list/download/ecxgsltomvejlzobxuahqrvmyndhobvclfkagtbt/-/any/username/direct/-/?plan_id=13127367"
+
+def fetch_proxy_ips() -> list[str]:
+    """Fetch current proxy IPs from Webshare API."""
+    try:
+        with urllib.request.urlopen(WEBSHARE_PROXY_LIST_URL, timeout=10) as response:
+            content = response.read().decode("utf-8")
+        # Each line is: ip:port:username:password
+        ips = []
+        for line in content.strip().splitlines():
+            parts = line.strip().split(":")
+            if len(parts) >= 2:
+                ips.append(f"{parts[0]}:{parts[1]}")
+        print(f"[Proxy] Fetched {len(ips)} IPs from Webshare")
+        return ips
+    except Exception as e:
+        print(f"[Proxy] Failed to fetch IPs, falling back to hardcoded: {e}")
+        # Fallback in case the API is unreachable
+        return [
+            "31.59.20.176:6754",
+            "23.95.150.145:6114",
+            "198.23.239.134:6540",
+        ]
+
+# Fetch once at cold start — cached for the lifetime of the Lambda container
+WEBSHARE_IPS = fetch_proxy_ips()
+WEBSHARE_CREDENTIALS = os.environ.get("WEBSHARE_CREDENTIALS")
+
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -24,20 +55,6 @@ SITE_ID     = "5751fd4290975b60e0489534"
 # SCRAPERAPI_KEY = os.environ.get("SCRAPERAPI_KEY", "YOUR_API_KEY_HERE")
 # Note: Requires http:// at the front for request libraries
 # PROXY_URL = os.environ.get("PROXY_URL")
-
-WEBSHARE_CREDENTIALS = os.environ.get("WEBSHARE_CREDENTIALS")
-WEBSHARE_IPS = [
-    "31.59.20.176:6754",
-    "23.95.150.145:6114",
-    "198.23.239.134:6540",
-    "45.38.107.97:6014",
-    "107.172.163.27:6543",
-    "198.105.121.200:6462",
-    "216.10.27.159:6837",
-    "142.111.67.146:5611",
-    "191.96.254.138:6185",
-    "31.58.9.4:6077"
-]
 
 REQUEST_DELAY_SECONDS = 1
 
@@ -57,26 +74,45 @@ MAX_WORKERS = 5
 # API helpers
 # ---------------------------------------------------------------------------
 
+_banned_ips = set()
+
 def _get(url: str, retries=3) -> dict:
+    global _banned_ips
+    
+    available_ips = [ip for ip in WEBSHARE_IPS if ip not in _banned_ips]
+    if not available_ips:
+        print("[Proxy] All IPs banned, resetting ban list")
+        _banned_ips = set()
+        available_ips = WEBSHARE_IPS
+
     for attempt in range(retries):
-        # 1. Pick a random IP from your list for this attempt
-        proxy_ip = random.choice(WEBSHARE_IPS)
+        proxy_ip  = random.choice(available_ips)
         proxy_url = f"http://{WEBSHARE_CREDENTIALS}@{proxy_ip}"
-        
+
         try:
-            # 2. Inject the specific proxy directly into the request
             resp = session.get(
-                url, 
-                timeout=120, 
+                url,
+                timeout=120,
                 proxies={"http": proxy_url, "https": proxy_url}
             )
             resp.raise_for_status()
             return resp.json()
-            
+
         except Exception as e:
+            error_str = str(e)
             print(f"[Warning] Attempt {attempt + 1} failed for {url} using {proxy_ip}: {e}")
+            
+            # Ban this IP if it's returning 403
+            if "403" in error_str:
+                print(f"[Proxy] Banning {proxy_ip} due to 403")
+                _banned_ips.add(proxy_ip)
+                available_ips = [ip for ip in WEBSHARE_IPS if ip not in _banned_ips]
+                if not available_ips:
+                    _banned_ips = set()
+                    available_ips = WEBSHARE_IPS
+
             if attempt < retries - 1:
-                time.sleep(3) 
+                time.sleep(3)
             else:
                 print(f"[Error] Final failure for {url}. Skipping.")
                 return {}
@@ -112,14 +148,31 @@ def fetch_periods(location_id: str, date_str: str) -> list:
     return data.get("periods", [])
 
 
+_debug_printed = False  # module-level flag
+
 def fetch_menu(location_id: str, period_id: str, date_str: str) -> dict:
+    global _debug_printed
+    
     url = f"{BASE_API_V1}/v1/location/{location_id}/periods/{period_id}?platform=0&date={date_str}"
     data = _get(url)
     if data:
+        if not _debug_printed:
+            import json
+            print(f"[DEBUG V1] location_id={location_id}")
+            print(f"[DEBUG V1] Keys: {list(data.keys())}")
+            print(f"[DEBUG V1] Full: {json.dumps(data, default=str)[:1500]}")
+            _debug_printed = True
         return data
 
     url = f"{BASE_API_V4}/locations/{location_id}/menu?date={date_str}&period={period_id}"
-    return _get(url)
+    data = _get(url)
+    if data and not _debug_printed:
+        import json
+        print(f"[DEBUG V4] location_id={location_id}")
+        print(f"[DEBUG V4] Keys: {list(data.keys())}")
+        print(f"[DEBUG V4] Full: {json.dumps(data, default=str)[:1500]}")
+        _debug_printed = True
+    return data
 
 
 def is_open(location: dict) -> bool:
@@ -134,16 +187,22 @@ def is_closed(menu_data: dict) -> bool:
 
 
 def parse_menu_items(menu_data: dict) -> list:
-    items      = []
-    categories = menu_data.get("period", {}).get("categories", [])
+    items = []
+
+    # V1 API: data["menu"]["periods"]["categories"]
+    # V4 API: data["period"]["categories"]
+    v1_period = menu_data.get("menu", {}).get("periods", {})
+    v4_period = menu_data.get("period", {})
+    period    = v1_period if v1_period else v4_period
+    categories = period.get("categories", [])
+
     for category in categories:
         station = category.get("name", "Unknown Station")
         for item in category.get("items", []):
-            # All filters (allergens, diet labels, etc.) — no type field exists
-            filters = [f["name"] for f in item.get("filters", [])]
+            filters      = [f["name"] for f in item.get("filters", [])]
             calories_raw = item.get("calories", "")
-            calories = int(calories_raw) if calories_raw != "" and calories_raw is not None else None
-            
+            calories     = int(calories_raw) if calories_raw not in ("", None) else None
+
             nutrients = [
                 {
                     "name":          n.get("name"),
@@ -152,7 +211,7 @@ def parse_menu_items(menu_data: dict) -> list:
                     "value_numeric": n.get("valueNumeric"),
                 }
                 for n in item.get("nutrients", [])
-                if n.get("value") and n.get("value") != "-"  # skip empty values
+                if n.get("value") and n.get("value") != "-"
             ]
 
             items.append({
@@ -162,8 +221,8 @@ def parse_menu_items(menu_data: dict) -> list:
                 "description": item.get("desc", ""),
                 "portion":     item.get("portion", ""),
                 "ingredients": item.get("ingredients", ""),
-                "calories": calories,
-                "filters":     filters,   # contains allergens + diet labels + icons
+                "calories":    calories,
+                "filters":     filters,
                 "nutrients":   nutrients,
             })
     return items
@@ -188,16 +247,27 @@ def _fetch_location_periods(location: dict, today: str) -> dict:
 
 
 def _fetch_menu_entry(loc_id: str, loc_name: str, period: dict, today: str) -> dict:
-    """Fetch and parse menu for a single location+period. Returns menu entry or None."""
     period_id   = str(period.get("id") or period.get("_id", ""))
     period_name = period.get("name", "Unknown Period")
     if not period_id:
         return None
     try:
         menu_data = fetch_menu(loc_id, period_id, today)
-        if is_closed(menu_data):
+
+        if not menu_data:
+            print(f"[Skip] {loc_name}/{period_name} — empty response (fetch failed)")
             return {"skipped": True}
+
+        if is_closed(menu_data):
+            print(f"[Skip] {loc_name}/{period_name} — closedOnDate=True")
+            return {"skipped": True}
+
         items = parse_menu_items(menu_data)
+
+        if not items:
+            print(f"[Skip] {loc_name}/{period_name} — 0 items parsed")
+            return {"skipped": True}
+
         return {
             "location_id":   loc_id,
             "location_name": loc_name,
