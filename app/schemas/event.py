@@ -8,13 +8,14 @@ class EventCreate(BaseModel):
     time:          datetime
     is_private:    bool = False
     invited_users: list[str] = []
-
+    message:       str = ""
 
 class EventUpdate(BaseModel):
     location:      str | None = None
     time:          datetime | None = None
     is_private:    bool | None = None
     invited_users: list[str] | None = None
+    message:       str | None = None
 
 
 class InviteStatusEntry(BaseModel):
@@ -29,6 +30,7 @@ class EventResponse(BaseModel):
     is_private:      bool
     invited_users:   list[str]
     invite_statuses: list[InviteStatusEntry] = []
+    message:         str = ""
     created_by:      str
     created_at:      datetime
     updated_at:      datetime
