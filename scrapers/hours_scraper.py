@@ -16,6 +16,8 @@ from datetime import datetime, timezone, timedelta
 import boto3
 from bs4 import BeautifulSoup
 
+import urllib.request
+
 os.environ["HOME"] = "/tmp"
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/ms-playwright"
 
@@ -24,32 +26,49 @@ os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/ms-playwright"
 # ---------------------------------------------------------------------------
 URL = "https://dineoncampus.com/tamu/hours-of-operation"
 
+
+WEBSHARE_PROXY_LIST_URL = "https://proxy.webshare.io/api/v2/proxy/list/download/ecxgsltomvejlzobxuahqrvmyndhobvclfkagtbt/-/any/username/direct/-/?plan_id=13127367"
+
+def fetch_proxy_ips() -> list[str]:
+    """Fetch current proxy IPs from Webshare API."""
+    try:
+        with urllib.request.urlopen(WEBSHARE_PROXY_LIST_URL, timeout=10) as response:
+            content = response.read().decode("utf-8")
+        # Each line is: ip:port:username:password
+        ips = []
+        for line in content.strip().splitlines():
+            parts = line.strip().split(":")
+            if len(parts) >= 2:
+                ips.append(f"{parts[0]}:{parts[1]}")
+        print(f"[Proxy] Fetched {len(ips)} IPs from Webshare")
+        return ips
+    except Exception as e:
+        print(f"[Proxy] Failed to fetch IPs, falling back to hardcoded: {e}")
+        # Fallback in case the API is unreachable
+        return [
+            "31.59.20.176:6754",
+            "23.95.150.145:6114",
+            "198.23.239.134:6540",
+        ]
+
 WEBSHARE_CREDENTIALS = os.environ.get("WEBSHARE_CREDENTIALS")
-WEBSHARE_IPS = [
-    "31.59.20.176:6754",
-    "23.95.150.145:6114",
-    "198.23.239.134:6540",
-    "45.38.107.97:6014",
-    "107.172.163.27:6543",
-    "198.105.121.200:6462",
-    "216.10.27.159:6837",
-    "142.111.67.146:5611",
-    "191.96.254.138:6185",
-    "31.58.9.4:6077",
-]
+WEBSHARE_IPS = fetch_proxy_ips()
 
 # ---------------------------------------------------------------------------
 # Browser helpers
 # ---------------------------------------------------------------------------
 
-def get_proxy() -> dict:
-    """Pick a random Webshare proxy and return Playwright proxy config."""
-    ip_port  = random.choice(WEBSHARE_IPS)
+def get_proxy(used_ips: list = None) -> dict:
+    available = [ip for ip in WEBSHARE_IPS if ip not in (used_ips or [])]
+    if not available:
+        available = WEBSHARE_IPS
+    ip_port  = random.choice(available)
     user, pw = WEBSHARE_CREDENTIALS.split(":")
     return {
         "server":   f"http://{ip_port}",
         "username": user,
         "password": pw,
+        "_ip":      ip_port,
     }
 
 
@@ -197,9 +216,12 @@ def scrape_target_date(html: str, week_dates: list[str], target_date: str) -> li
 def scrape_hours(target_date_str: str, max_retries: int = 3) -> list[dict]:
     from playwright.sync_api import sync_playwright
 
+    used_ips = []  # track used proxies
+
     for attempt in range(max_retries):
         print(f"\n--- Attempt {attempt + 1} of {max_retries} ---")
-        proxy   = get_proxy()
+        proxy   = get_proxy(used_ips)
+        used_ips.append(proxy["_ip"])  # mark as used
         browser = None
 
         try:
@@ -209,22 +231,34 @@ def scrape_hours(target_date_str: str, max_retries: int = 3) -> list[dict]:
 
                 print(f"Loading {URL} via proxy {proxy['server']} ...")
                 page.goto(URL, wait_until="networkidle", timeout=60000)
-                time.sleep(3)
+                time.sleep(5)
 
                 title = page.title()
                 print(f"Page title: '{title}'")
 
                 # Check for Cloudflare block
-                if any(x in title for x in ["Just a moment", "Cloudflare", "403", "Access Denied"]):
-                    print("Blocked — trying next proxy...")
+                if not title or any(x in title for x in ["Just a moment", "Cloudflare", "403", "Access Denied"]):
+                    print(f"Blocked or empty page (title: '{title}') — trying next proxy...")
                     browser.close()
                     continue
 
                 # Wait for the hours table to appear
                 try:
-                    page.wait_for_selector("tr", timeout=15000)
+                    # Wait for "Week of" text which only appears when Angular has fully rendered
+                    page.wait_for_selector(
+                        "text=Week of",
+                        timeout=20000
+                    )
+                    # Give Angular extra time to render the full table
+                    time.sleep(3)
                 except Exception:
-                    print("Hours table not found — retrying...")
+                    # Dump page content for debugging
+                    try:
+                        snippet = page.inner_text("body")[:300]
+                        print(f"Page content snippet: {snippet}")
+                    except Exception:
+                        pass
+                    print("Angular content not found — retrying...")
                     browser.close()
                     continue
 

@@ -4,19 +4,23 @@ from datetime import datetime
 
 
 class EventCreate(BaseModel):
-    location:        str
-    time:            datetime
-    is_private:      bool = False
-    invited_users:   list[str] = []  # list of user IDs
-    message: str | None = None
-
+    location:      str
+    time:          datetime
+    is_private:    bool = False
+    invited_users: list[str] = []
+    message:       str = ""
 
 class EventUpdate(BaseModel):
-    location:        str | None = None
-    time:            datetime | None = None
-    is_private:      bool | None = None
-    invited_users:   list[str] | None = None  # replaces entire list
-    message: str | None = None
+    location:      str | None = None
+    time:          datetime | None = None
+    is_private:    bool | None = None
+    invited_users: list[str] | None = None
+    message:       str | None = None
+
+
+class InviteStatusEntry(BaseModel):
+    user_id: str
+    status:  str  # "pending" | "accepted" | "declined"
 
 
 class EventResponse(BaseModel):
@@ -24,18 +28,33 @@ class EventResponse(BaseModel):
     location:        str
     time:            datetime
     is_private:      bool
-    invited_users:   list[str]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+    invited_users:   list[str]
+    invite_statuses: list[InviteStatusEntry] = []
+    message:         str = ""
     created_by:      str
     created_at:      datetime
     updated_at:      datetime
-    message: str | None = None
 
 
 class EventList(BaseModel):
     events: list[EventResponse]
     count:  int
 
-#Firebase
-class FCMTokenUpdate(BaseModel):
-    user_id: str
-    device_token: str
+
+class InviteRespond(BaseModel):
+    status: str  # "accepted" | "declined"
+
+
+class InviteResponse(BaseModel):
+    event_id:   str
+    event_time: str
+    location:   str
+    status:     str
+    invited_by: str
+    created_at: str
+    updated_at: str
+
+
+class InviteListResponse(BaseModel):
+    invites: list[InviteResponse]
+    count:   int

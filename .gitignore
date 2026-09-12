@@ -27,5 +27,6 @@ serviceAccountKey.json
 htmlcov/
 .pytest_cache/
 *.json 
+env.json
 scrapers/non-production/
 test_menu.py

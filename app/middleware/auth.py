@@ -36,7 +36,7 @@ async def verify_cognito_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
     token = credentials.credentials
-    #temporary bypass for dev login
+    #temporary bypass for dev login, remove later
     if token == "dummy.dev.token":
         return {
             "sub": "dev-12345",

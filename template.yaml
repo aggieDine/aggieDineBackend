@@ -18,7 +18,6 @@ Globals:
         AWS_COGNITO_APP_CLIENT_ID: !Ref CognitoAppClientId
         FIREBASE_CREDENTIALS: '{{resolve:ssm:/my-app/firebase-credentials:1}}'
         WEBSHARE_CREDENTIALS: '{{resolve:ssm:/my-app/webshare-credentials:1}}'
-        PROXY_URL: '{{resolve:ssm:/my-app/webshare-proxy-url:1}}'
 
 Parameters:
   ServiceName:
